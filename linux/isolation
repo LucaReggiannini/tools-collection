@@ -1,0 +1,96 @@
+#!/bin/sh
+
+inboundException() {
+    echo "Creating exception for $1 on port $2 ($3)"
+    sudo iptables --append INPUT --protocol "$3" --destination "$defaultInterfaceIpAddress" --destination-port "$2" --match conntrack --ctstate NEW,ESTABLISHED --jump ACCEPT
+    sudo iptables --append OUTPUT --protocol "$3" --source "$defaultInterfaceIpAddress" --source-port "$2" --match conntrack --ctstate ESTABLISHED --jump ACCEPT
+}
+
+outboundException() {
+    echo "Creating exception for $1 on port $2 ($3)"
+    sudo iptables --append OUTPUT --protocol "$3" --source "$defaultInterfaceIpAddress" --destination-port "$2" --match conntrack --ctstate NEW,ESTABLISHED --jump ACCEPT
+    sudo iptables --append INPUT --protocol "$3" --destination "$defaultInterfaceIpAddress" --source-port "$2" --match conntrack --ctstate ESTABLISHED --jump ACCEPT
+    
+}
+
+if [ -z "$1" ] || [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
+	echo '
+isolation
+
+Description:
+    Isolates machine from local network. Requires root privileges, "iptables" and "iproute2".
+    By default allows outgoing DNS requests only.
+
+Usage: 
+    isolation [OPTIONS] [FILE]
+	
+Options:
+    -h --help
+        Show this help
+    -r --reset
+        Delete all iptables rules and reset traffic counters
+    -p --permissive
+        Enables all exceptions
+
+    Exceptions:
+        --rdp
+            Allows incoming RDP connections on port 3389. For remote controlled machine
+        --vnc
+            Allows incoming VNC connections on port 5900. For remote controlled machine
+        --ssh
+            Allows incoming SSH connections on port 22. For remote controlled machine
+        --dhcp
+            Allows DHCP requests from the machine
+        --netbios-ns
+            Allows NetBIOS-NS requests from the machine
+'
+else
+    if [ "$1" == "-r" ] || [ "$1" == "--reset" ]; then
+        echo "Resettings iptables"
+        sudo iptables -Z
+        sudo iptables -F
+        exit 0
+    fi
+
+	defaultGateway=$(ip route | grep "default via " | cut --delimiter=" " --fields="3")
+    defaultInterface=$(ip route | grep "default via " | cut --delimiter=" " --fields="5")
+    defaultInterfaceIpAddress=$(ip address show $defaultInterface | grep -Eo "inet\s[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}" | cut --delimiter=" " --fields="2")
+
+    echo "Default Gateway: $defaultGateway"
+    echo "Default Interface: $defaultInterface"
+    echo "Default Interface (IP Address): $defaultInterfaceIpAddress"
+
+    for arg in "$@"; do
+		if [ "${arg}" == "--vnc" ]; then
+            inboundException "VNC" "5900" "tcp"
+        elif [ "${arg}" == "--rdp" ]; then
+            inboundException "RDP" "3389" "tcp"
+        elif [ "${arg}" == "--ssh" ]; then
+            inboundException "SSH" "22" "tcp"
+        elif [ "${arg}" == "--dhcp" ]; then
+            outboundException "DHCP" "67" "tcp"
+            outboundException "DHCP" "67" "udp"
+        elif [ "${arg}" == "--netbios-ns" ]; then
+            outboundException "NetBIOS-NS" "137" "udp"
+            outboundException "NetBIOS-NS" "137" "udp"
+        elif [ "${arg}" == "-p" ] || [ "${arg}" == "--permissive" ]; then
+            inboundException "VNC" "5900" "tcp"
+            inboundException "RDP" "3389" "tcp"
+            inboundException "SSH" "22" "tcp"
+            outboundException "DHCP" "67" "tcp"
+            outboundException "DHCP" "67" "udp"
+            outboundException "NetBIOS-NS" "137" "tcp"
+            outboundException "NetBIOS-NS" "137" "udp"
+        else        
+            echo 'Invalid argument. Use isolation -h or --help for help'
+            exit 1
+        fi
+	done
+   
+    outboundException "DNS" "53" "tcp"
+    outboundException "DNS" "53" "udp"
+    echo "Closing connections to local nework"
+    sudo iptables --append OUTPUT --destination "10.0.0.0/8" --jump DROP
+    sudo iptables --append OUTPUT --destination "172.16.0.0/12" --jump DROP
+    sudo iptables --append OUTPUT --destination "192.168.0.0/16" --jump DROP
+fi

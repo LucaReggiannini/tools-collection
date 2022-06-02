@@ -1,0 +1,99 @@
+#!/usr/bin/python
+
+import re
+import io
+import sys
+import os 
+
+
+
+def help():
+    print(
+        '''
+geturls
+
+SYNOPSIS: 
+    geturl [OPTION] [FILE]
+
+DESCRIPTION:
+    Extracts URLs from a file using a regular expression.
+    This Regex is based on a superficial interpretation of RFC1738 (see: https://datatracker.ietf.org/doc/html/rfc1738) so it may not work on all types of data.
+    Use this script at your own risk and verify if the matches are correct!
+
+    Matches <scheme>://<scheme-specific-part> (two slashes have been added to the RFC definition).
+    Scheme names consist of letters "a"--"z" (not case sensitive), digits, and the following characters "+", ".", "-".
+    Scheme specific part can be everything until a non safe character (defined in RFC) is matched: "<", ">", "{", "}", "|", "\", "^", "[", "]", "`".
+    Omitted safe character are: "%", "#" and "~". They can be used to obfuscate malicious payloads into working URLs.
+
+OPTION:
+    -h, --help
+        show the manual
+
+    -r, --replace
+        surrounds "dots" symbols with square brackets
+
+        '''
+    )
+    exit(1)
+
+def main():
+    REGEX = "([a-zA-Z0-9\+\.\-]+:\/\/.*?)[\<|\>|\"|\{|\}|\||\\|\^|\[|\]|\`|\s|\n]"
+    files = []
+    urls = []
+    replace = False
+
+    # Parse arguments
+    args = sys.argv
+    for arg in args:
+        if arg == args[0]:
+            continue
+        elif arg == "-h" or arg == "--help":
+            help()
+            continue
+        elif arg == "-r" or arg == "--replace":
+            replace = True
+            continue
+        else:
+            files.append(arg) 
+
+    # Parse file
+    if files: 
+        for file in files:
+            if not os.path.exists(file):
+                print("Error: " + file + " not found.")
+            else:
+                stream = io.open(
+                    file,
+                    mode = "r",
+                    encoding = "utf-8",
+                    errors = "surrogateescape")
+
+                fileContent = stream.read()
+                matches = re.findall(REGEX, fileContent)
+                if matches:
+                    for match in matches:
+                        urls.append(match)
+    else:
+        print("Error: no input file given.")
+        help()
+
+    if urls:
+        # Order and remove duplicates
+        urls = list(set(urls))
+
+        # Replace "." with "[.]"
+        if replace == True:
+            c = 0
+            for url in urls:
+                urls[c] = url.replace(".", "[.]")
+                c =  c + 1
+        for url in urls:
+            print(url)
+    else:
+        print("Warning: no url found.")
+
+if __name__=="__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        print('Warning: keyboard interrupt received')
