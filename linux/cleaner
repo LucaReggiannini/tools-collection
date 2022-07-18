@@ -28,8 +28,8 @@ fi
 sudo pacman -R $(pacman -Qtdq)
 
 # Removes the entire cache of all packages
-sudo pacman -Scc --noconfirm
-sudo pikaur -Scc --noconfirm
+yes | sudo pacman -Scc
+yes | sudo pikaur -Scc
 sudo paccache -r -f
 
 # Manually removes files
