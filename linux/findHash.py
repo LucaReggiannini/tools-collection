@@ -102,9 +102,33 @@ if __name__ == "__main__":
         print("Invalid file given")
         help()
 
-    if (re.search('/^([a-f\d]{32}|[A-F\d]{32})$/', hashToSearch) == 0) and \
-    (re.search('/\b([a-f0-9]{40})\b/', hashToSearch)==0) and \
-    (re.search('^[A-Fa-f0-9]{64}$', hashToSearch)==0):
+    # Check if hash is valid
+    hashIsValid = False
+
+    try:
+        md5 = re.match('^([a-fA-F0-9]{32})$', hashToSearch)
+        md5.group(1)
+        hashIsValid = True
+    except:
+        pass
+
+    try:
+        sha1 = re.match('^([a-fA-F0-9]{40})$', hashToSearch)
+        sha1.group(1)
+        hashIsValid = True
+    except:
+        pass
+
+    try:
+        sha256 = re.match('^([a-fA-F0-9]{64})$', hashToSearch)
+        sha256.group(1)
+        hashIsValid = True
+    except:
+        pass
+
+    if hashIsValid == True:
+        pass
+    else:  
         print("Invalid hash given (must be md5, sha1 or sha256)")
         help()
 
