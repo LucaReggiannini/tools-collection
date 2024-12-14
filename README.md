@@ -1,2 +1,2 @@
 # tools-collection
-Various tools that I use on a daily basis
+Various tools for Windows and Linux that I use on a daily basis
